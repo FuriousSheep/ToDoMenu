@@ -5,6 +5,7 @@ import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import List.Extra exposing (setAt, getAt)
 import String
 import Url
 
@@ -28,7 +29,7 @@ type alias Model =
     , route : Route
     }
 
-type Route = AddTaskRoute Task| TaskMenu
+type Route = AddTaskRoute Task | TaskMenu
 
 type alias Task = 
     { name : TaskName
@@ -40,6 +41,14 @@ type TaskInputs = TaskName | TaskDescription | TaskSpoons
 type alias TaskName = String
 type alias TaskDescription = String
 type alias TaskSpoons = Int
+
+-- MODEL HELPERS
+
+emptyTask : Task
+emptyTask = { name = ""
+            , description = ""
+            , spoons = 0
+            }
 
 -- INIT
 init : flags -> Url.Url -> Nav.Key -> ( Model, Cmd msg )
@@ -64,10 +73,12 @@ subscriptions _ =
     Sub.none
 
 -- MESSAGE
-type Msg = EditId String
-         | UpdateTask TaskInputs String
-         | UrlChanged Url.Url
+type Msg = UrlChanged Url.Url
          | LinkClicked Browser.UrlRequest
+         --
+         | AddTaskToMenu
+         | EditId String
+         | UpdateTask TaskInputs Int String
 
 
 -- UPDATE
@@ -75,23 +86,39 @@ type Msg = EditId String
 update : Msg -> Model ->  ( Model, Cmd Msg )
 update msg model =
     case msg of
+        UrlChanged _ -> (model, Cmd.none)
+        LinkClicked _ -> (model, Cmd.none)
+
+        AddTaskToMenu -> 
+            let newModel = { model | route = AddTaskRoute emptyTask }
+            in
+            case model.route of
+                AddTaskRoute task -> ({newModel | tasks = model.tasks ++ [task]}, Cmd.none)
+                _ -> (model, Cmd.none)
 
         EditId newId ->
              ( {model | id = newId}, Cmd.none )
 
-        UpdateTask taskInput value ->
+        UpdateTask taskInput index value ->
             case model.route of
                 AddTaskRoute task ->
-                    case taskInput of
-                    TaskName -> 
-                        ({model | route = AddTaskRoute <| {task | name =  value} }, Cmd.none)
-                    TaskDescription ->
-                        ({model | route = AddTaskRoute <| {task | description =  value} }, Cmd.none)
-                    TaskSpoons ->
-                        ({model | route = AddTaskRoute <| {task | spoons = stringToSpoons value} }, Cmd.none)
-                _ -> (model, Cmd.none)
-        UrlChanged _ -> (model, Cmd.none)
-        LinkClicked _ -> (model, Cmd.none)
+                    let
+                        toUpdateTask = getAt index model.tasks 
+                    in
+                    case toUpdateTask of
+                        Just gotTask ->
+                            case taskInput of
+                                TaskName -> 
+                                    ( {model | tasks = setAt index {gotTask | name = value } model.tasks }
+                                    , Cmd.none )
+                                TaskDescription ->
+                                    ( {model | tasks = setAt index {gotTask | description = value } model.tasks }
+                                    , Cmd.none)
+                                TaskSpoons ->
+                                    ( {model | tasks = setAt index {gotTask | spoons = stringToSpoons value } model.tasks } 
+                                    , Cmd.none)
+                        Nothing -> (model, Cmd.none)
+                TaskMenu -> (model, Cmd.none)
 
 -- VIEW
 view : Model -> Browser.Document Msg
@@ -100,7 +127,9 @@ view model =
     , body = 
         case model.route of
             AddTaskRoute task ->
-                [ div [] [inputTask task] ]
+                [ div [] <| List.map inputTask ( List.indexedMap Tuple.pair model.tasks) 
+                , addTaskButton
+                ]
             TaskMenu -> 
                 [ div [] [text model.id] 
                 , input [value model.id, onInput EditId] []
@@ -108,12 +137,16 @@ view model =
     }
 
 -- COMPONENTS
-inputTask : Task -> Html Msg 
-inputTask task =
+addTaskButton : Html Msg
+addTaskButton =
+    button [onClick AddTaskToMenu] [text "+"]
+
+inputTask : (Int, Task) -> Html Msg 
+inputTask (index, task) =
     div []
-        [ input [onInput (UpdateTask TaskName),value task.name] []
-        , input [onInput (UpdateTask TaskDescription),value task.description] []
-        , input [onInput (UpdateTask TaskSpoons),value (String.fromInt task.spoons), type_ "number"] []
+        [ input [onInput (UpdateTask TaskName index),value task.name] []
+        , input [onInput (UpdateTask TaskDescription index),value task.description] []
+        , input [onInput (UpdateTask TaskSpoons index),value (String.fromInt task.spoons), type_ "number"] []
         ]    
 
 displayTask : Task -> Html Msg
