@@ -2,10 +2,15 @@ module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
+import Debug
+import Element as E
+import Element.Events as Ev
+import Element.Background as Bg
+import Element.Input as Input
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import List.Extra exposing (setAt, getAt)
+import List.Extra exposing (setAt, getAt, zip)
 import String
 import Url
 
@@ -23,13 +28,13 @@ main =
 
 -- MODEL 
 type alias Model = 
-    { url : Url.Url
-    , id : String 
+    { url : Url.Url 
     , tasks : List Task
     , route : Route
     }
 
-type Route = AddTaskRoute Task | TaskMenu
+type Route = AddTaskRoute 
+           | TaskMenu
 
 type alias Task = 
     { name : TaskName
@@ -43,6 +48,18 @@ type alias TaskDescription = String
 type alias TaskSpoons = Int
 
 -- MODEL HELPERS
+
+routeToString : Route -> String
+routeToString route =
+    case route of
+       AddTaskRoute -> "AddTaskRoute"
+       TaskMenu -> "TaskMenu"
+
+routesList : List Route
+routesList = 
+    [ AddTaskRoute
+    , TaskMenu
+    ]
 
 emptyTask : Task
 emptyTask = { name = ""
@@ -58,13 +75,8 @@ init _ url _ =
 initModel : Url.Url -> Model
 initModel url = 
     { url = url
-    , id = "Hello there!"
     , tasks = []
-    , route = AddTaskRoute         
-        { name = ""
-        , description = ""
-        , spoons = 0
-        }
+    , route = AddTaskRoute
     }
 
 -- SUBSCRIPTIONS
@@ -77,7 +89,7 @@ type Msg = UrlChanged Url.Url
          | LinkClicked Browser.UrlRequest
          --
          | AddTaskToMenu
-         | EditId String
+         | ChangeRoute Route
          | UpdateTask TaskInputs Int String
 
 
@@ -90,18 +102,16 @@ update msg model =
         LinkClicked _ -> (model, Cmd.none)
 
         AddTaskToMenu -> 
-            let newModel = { model | route = AddTaskRoute emptyTask }
-            in
             case model.route of
-                AddTaskRoute task -> ({newModel | tasks = model.tasks ++ [task]}, Cmd.none)
+                AddTaskRoute -> ({model | tasks = model.tasks ++ [emptyTask]}, Cmd.none)
                 _ -> (model, Cmd.none)
 
-        EditId newId ->
-             ( {model | id = newId}, Cmd.none )
+        ChangeRoute route -> 
+            ({model | route = route}, Cmd.none)
 
         UpdateTask taskInput index value ->
             case model.route of
-                AddTaskRoute task ->
+                AddTaskRoute ->
                     let
                         toUpdateTask = getAt index model.tasks 
                     in
@@ -123,31 +133,66 @@ update msg model =
 -- VIEW
 view : Model -> Browser.Document Msg
 view model =
-    { title = "ToDoMenu"
-    , body = 
-        case model.route of
-            AddTaskRoute task ->
-                [ div [] <| List.map inputTask ( List.indexedMap Tuple.pair model.tasks) 
+    let
+        currentView = case model.route of
+            AddTaskRoute ->
+                [ E.column [] <| List.map inputTask ( List.indexedMap Tuple.pair model.tasks) 
                 , addTaskButton
                 ]
             TaskMenu -> 
-                [ div [] [text model.id] 
-                , input [value model.id, onInput EditId] []
-                ]
+                [ E.el [] <| E.text "taskMenu" ]
+    in
+    
+    { title = "ToDoMenu"
+    , body = 
+        [ E.layout [] <| E.column [] (navBar :: currentView) ]
     }
 
--- COMPONENTS
-addTaskButton : Html Msg
-addTaskButton =
-    button [onClick AddTaskToMenu] [text "+"]
+navBar = 
+    E.row 
+        [ E.width E.fill
+        , E.spaceEvenly
+        , E.paddingXY 40 20
+        , Bg.color (E.rgba255 240 0 245 50)
+        ] 
+        (List.map navLink <| zip (List.map routeToString routesList) routesList )
+    
 
-inputTask : (Int, Task) -> Html Msg 
+navLink : (String, Route) -> E.Element Msg
+navLink (str, route) = 
+    E.el 
+        [ Ev.onClick <| ChangeRoute route 
+        , E.pointer
+        ] 
+        (E.text str)
+
+-- COMPONENTS
+addTaskButton : E.Element Msg
+addTaskButton =
+    Input.button [E.width <| E.maximum 40 (E.fill)] {onPress = Just AddTaskToMenu, label = E.text "+"}
+
+inputTask : (Int, Task) -> E.Element Msg 
 inputTask (index, task) =
-    div []
-        [ input [onInput (UpdateTask TaskName index),value task.name] []
-        , input [onInput (UpdateTask TaskDescription index),value task.description] []
-        , input [onInput (UpdateTask TaskSpoons index),value (String.fromInt task.spoons), type_ "number"] []
-        ]    
+    E.row [E.width E.fill]
+        [ Input.text [E.width <| E.fillPortion 1] 
+            { onChange = UpdateTask TaskName index
+            , text = task.name
+            , placeholder = Just (Input.placeholder [] <| E.text "Dress up")
+            , label = Input.labelHidden "Name"
+            }
+        , Input.text [E.width <| E.fillPortion 3] 
+            { onChange = UpdateTask TaskDescription index
+            , text = task.description
+            , placeholder = Just (Input.placeholder [] <| E.text "Put on the nice pants")
+            , label = Input.labelHidden "Description"
+            }
+        , Input.text [E.width <| E.fillPortion 1] 
+            { onChange = UpdateTask TaskSpoons index
+            , text = spoonsToString task.spoons
+            , placeholder = Just (Input.placeholder [] <| E.text "1-3")
+            , label = Input.labelHidden "Spoons"
+            }
+        ]
 
 displayTask : Task -> Html Msg
 displayTask task = 
@@ -165,3 +210,10 @@ stringToSpoons str =
        2 -> 2
        3 -> 3
        _ -> 0
+
+spoonsToString : TaskSpoons -> String
+spoonsToString spoons = case spoons of
+   3 -> "3" 
+   2 -> "2"
+   1 -> "1"
+   _ -> "0"
