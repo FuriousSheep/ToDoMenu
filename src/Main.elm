@@ -6,6 +6,7 @@ import Debug
 import Element as E
 import Element.Events as Ev
 import Element.Background as Bg
+import Element.Border as Border
 import Element.Input as Input
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -136,7 +137,9 @@ view model =
     let
         currentView = case model.route of
             AddTaskRoute ->
-                [ E.column [] <| List.map inputTask ( List.indexedMap Tuple.pair model.tasks) 
+                [ E.column 
+                    [ E.centerX ] 
+                    <| List.map inputTask ( List.indexedMap Tuple.pair model.tasks ) 
                 , addTaskButton
                 ]
             TaskMenu -> 
@@ -145,15 +148,23 @@ view model =
     
     { title = "ToDoMenu"
     , body = 
-        [ E.layout [] <| E.column [] (navBar :: currentView) ]
+        [ E.layout 
+            [ E.width E.fill ] 
+            <| E.column 
+                [ E.width E.fill
+                , E.spacing 4] 
+                (navBar :: currentView) 
+        ]
     }
 
+navBar : E.Element Msg
 navBar = 
     E.row 
         [ E.width E.fill
         , E.spaceEvenly
         , E.paddingXY 40 20
         , Bg.color (E.rgba255 240 0 245 50)
+        , Border.solid
         ] 
         (List.map navLink <| zip (List.map routeToString routesList) routesList )
     
@@ -169,7 +180,20 @@ navLink (str, route) =
 -- COMPONENTS
 addTaskButton : E.Element Msg
 addTaskButton =
-    Input.button [E.width <| E.maximum 40 (E.fill)] {onPress = Just AddTaskToMenu, label = E.text "+"}
+    Input.button 
+        [ E.width <| E.px 80
+        , E.height <| E.px 40
+        , E.centerX
+        , Bg.color <| E.rgba255 240 30 245 70
+        , Border.rounded 8
+        , Border.shadow 
+            { offset = (0, 0)
+            , size = 4
+            , blur = 1
+            , color = E.rgba255 120 20 120 0.7
+            }
+        ] 
+        { onPress = Just AddTaskToMenu, label = E.el [E.centerX] <| E.text "+" }
 
 inputTask : (Int, Task) -> E.Element Msg 
 inputTask (index, task) =
