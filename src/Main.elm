@@ -15,7 +15,6 @@ import List.Extra exposing (setAt, getAt, zip)
 import String
 import Url
 
-
 main : Program () Model Msg
 main =
     Browser.application
@@ -30,12 +29,20 @@ main =
 -- MODEL 
 type alias Model = 
     { url : Url.Url 
-    , tasks : List Task
+    , menus : List Menu
     , route : Route
     }
 
-type Route = AddTaskRoute 
-           | TaskMenu
+type Route = EditMenuRoute Menu
+           | MenuListRoute
+           | PickTasksRoute
+
+
+type alias Menu = 
+    { title : String
+    , description : String
+    , tasks : List Task
+    }
 
 type alias Task = 
     { name : TaskName
@@ -53,13 +60,15 @@ type alias TaskSpoons = Int
 routeToString : Route -> String
 routeToString route =
     case route of
-       AddTaskRoute -> "AddTaskRoute"
-       TaskMenu -> "TaskMenu"
+       EditMenuRoute _ -> "EditMenuRoute"
+       MenuListRoute -> "MenuListRoute"
+       PickTasksRoute -> "PickTasksRoute"
 
 routesList : List Route
 routesList = 
-    [ AddTaskRoute
-    , TaskMenu
+    [ EditMenuRoute emptyMenu
+    , MenuListRoute
+    , PickTasksRoute
     ]
 
 emptyTask : Task
@@ -67,6 +76,13 @@ emptyTask = { name = ""
             , description = ""
             , spoons = 0
             }
+
+emptyMenu : Menu
+emptyMenu = 
+    { title = ""
+    , description = ""
+    , tasks = []
+    }
 
 -- INIT
 init : flags -> Url.Url -> Nav.Key -> ( Model, Cmd msg )
@@ -76,8 +92,8 @@ init _ url _ =
 initModel : Url.Url -> Model
 initModel url = 
     { url = url
-    , tasks = []
-    , route = AddTaskRoute
+    , menus = []
+    , route = EditMenuRoute emptyMenu
     }
 
 -- SUBSCRIPTIONS
@@ -92,6 +108,7 @@ type Msg = UrlChanged Url.Url
          | AddTaskToMenu
          | ChangeRoute Route
          | UpdateTask TaskInputs Int String
+         | UpdateNewMenuTitle String
 
 
 -- UPDATE
@@ -104,7 +121,11 @@ update msg model =
 
         AddTaskToMenu -> 
             case model.route of
-                AddTaskRoute -> ({model | tasks = model.tasks ++ [emptyTask]}, Cmd.none)
+                EditMenuRoute oldMenu -> 
+                    let
+                        newMenu = {oldMenu | tasks = oldMenu.tasks ++ [emptyTask]}
+                    in
+                    ({model | route = EditMenuRoute newMenu}, Cmd.none)
                 _ -> (model, Cmd.none)
 
         ChangeRoute route -> 
@@ -112,47 +133,83 @@ update msg model =
 
         UpdateTask taskInput index value ->
             case model.route of
-                AddTaskRoute ->
+                EditMenuRoute oldMenu ->
+                    updateTask taskInput index value model oldMenu
+                MenuListRoute -> (model, Cmd.none)
+                PickTasksRoute -> (model, Cmd.none)
+
+        UpdateNewMenuTitle newTitle -> 
+            case model.route of
+                EditMenuRoute oldMenu ->
                     let
-                        toUpdateTask = getAt index model.tasks 
+                        newMenu = {oldMenu | title = newTitle}
                     in
-                    case toUpdateTask of
-                        Just gotTask ->
-                            case taskInput of
-                                TaskName -> 
-                                    ( {model | tasks = setAt index {gotTask | name = value } model.tasks }
-                                    , Cmd.none )
-                                TaskDescription ->
-                                    ( {model | tasks = setAt index {gotTask | description = value } model.tasks }
-                                    , Cmd.none)
-                                TaskSpoons ->
-                                    ( {model | tasks = setAt index {gotTask | spoons = stringToSpoons value } model.tasks } 
-                                    , Cmd.none)
-                        Nothing -> (model, Cmd.none)
-                TaskMenu -> (model, Cmd.none)
+                    ( { model | route = EditMenuRoute newMenu }
+                    , Cmd.none )
+                MenuListRoute -> (model, Cmd.none)
+                PickTasksRoute -> (model, Cmd.none)
+
+updateTask taskInput index value model oldMenu =
+    let
+        toUpdateTask = getAt index oldMenu.tasks
+    in
+    case toUpdateTask of
+        Just gotTask ->
+            case taskInput of
+                TaskName -> 
+                    let 
+                        newMenu = {oldMenu | tasks = setAt index {gotTask | name = value } oldMenu.tasks }
+                    in
+                    ( {model | route = EditMenuRoute newMenu }
+                    , Cmd.none )
+                TaskDescription ->
+                    let 
+                        newMenu = {oldMenu | tasks = setAt index {gotTask | description = value } oldMenu.tasks }
+                    in
+                    ( {model | route = EditMenuRoute newMenu }
+                    , Cmd.none)
+                TaskSpoons ->
+                    let 
+                        newMenu = {oldMenu | tasks = setAt index {gotTask | spoons = stringToSpoons value } oldMenu.tasks }
+                    in
+                    ( { model | route = EditMenuRoute newMenu } 
+                    , Cmd.none)
+        Nothing -> (model, Cmd.none) --this should not be possible
+
 
 -- VIEW
 view : Model -> Browser.Document Msg
 view model =
     let
         currentView = case model.route of
-            AddTaskRoute ->
+            EditMenuRoute newMenu->
                 [ E.column 
                     [ E.centerX ] 
-                    <| List.map inputTask ( List.indexedMap Tuple.pair model.tasks ) 
+                    <|  [ Input.text
+                            []
+                            { onChange = UpdateNewMenuTitle
+                            , text = newMenu.title
+                            , label = Input.labelAbove [E.centerX] <| E.text "Menu title"
+                            , placeholder = Just <| Input.placeholder [] <| E.text "Self-care activities"
+                            }
+                        ]
+                , E.column 
+                    [ E.centerX ]
+                    <| List.map inputTask ( List.indexedMap Tuple.pair newMenu.tasks ) 
                 , addTaskButton
                 ]
-            TaskMenu -> 
-                [ E.el [] <| E.text "taskMenu" ]
+            MenuListRoute -> 
+                [ E.el [] <| E.text "MenuListRoute" ]
+            PickTasksRoute -> 
+                [ E.el [] <| E.text "PickTasksRoute" ]
     in
-    
     { title = "ToDoMenu"
     , body = 
         [ E.layout 
             [ E.width E.fill ] 
             <| E.column 
                 [ E.width E.fill
-                , E.spacing 4] 
+                , E.spacing 8] 
                 (navBar :: currentView) 
         ]
     }
@@ -186,7 +243,7 @@ addTaskButton =
         , E.centerX
         , Bg.color <| E.rgba255 240 30 245 70
         , Border.rounded 8
-        , Border.shadow 
+        , Border.shadow
             { offset = (0, 0)
             , size = 4
             , blur = 1
