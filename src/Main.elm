@@ -3,6 +3,7 @@ module Main exposing (..)
 import Browser
 import Browser.Navigation as Nav
 import Debug
+import Domain exposing (..)
 import Element as E
 import Element.Events as Ev
 import Element.Background as Bg
@@ -25,79 +26,6 @@ main =
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }
-
--- MODEL 
-type alias Model = 
-    { url : Url.Url 
-    , menus : List TodoMenu
-    , route : Route
-    }
-
-type Route = EditMenuRoute TodoMenu
-           | MenuListRoute
-           | PickTasksRoute
-
-
-type alias TodoMenu = 
-    { title : String
-    , description : String
-    , tasks : List Task
-    }
-
-type alias Task = 
-    { name : TaskName
-    , description : TaskDescription
-    , spoons : TaskSpoons
-    }
-
-type TaskInputs = TaskName | TaskDescription | TaskSpoons
-type alias TaskName = String
-type alias TaskDescription = String
-type alias TaskSpoons = Int
-
--- MODEL HELPERS
-
-routeToString : Route -> String
-routeToString route =
-    case route of
-       EditMenuRoute _ -> "EditMenuRoute"
-       MenuListRoute -> "MenuListRoute"
-       PickTasksRoute -> "PickTasksRoute"
-
-routesList : List Route
-routesList = 
-    [ EditMenuRoute emptyMenu
-    , MenuListRoute
-    , PickTasksRoute
-    ]
-
-emptyTask : Task
-emptyTask = { name = ""
-            , description = ""
-            , spoons = 0
-            }
-
-emptyMenu : TodoMenu
-emptyMenu = 
-    { title = ""
-    , description = ""
-    , tasks = []
-    }
-
-stringToSpoons : String -> TaskSpoons
-stringToSpoons str = 
-    case Maybe.withDefault 0 <| String.toInt str of
-       1 -> 1
-       2 -> 2
-       3 -> 3
-       _ -> 0
-
-spoonsToString : TaskSpoons -> String
-spoonsToString spoons = case spoons of
-   3 -> "3" 
-   2 -> "2"
-   1 -> "1"
-   _ -> "0"
 
 -- INIT
 init : flags -> Url.Url -> Nav.Key -> ( Model, Cmd msg )
@@ -174,19 +102,22 @@ updateTask taskInput index value model oldMenu =
             case taskInput of
                 TaskName -> 
                     let 
-                        newMenu = {oldMenu | tasks = setAt index {gotTask | name = value } oldMenu.tasks }
+                        newTask = { gotTask | name = value }
+                        newMenu = { oldMenu | tasks = setAt index newTask oldMenu.tasks }
                     in
-                    ( {model | route = EditMenuRoute newMenu }
+                    ( { model | route = EditMenuRoute newMenu }
                     , Cmd.none )
                 TaskDescription ->
                     let 
-                        newMenu = {oldMenu | tasks = setAt index {gotTask | description = value } oldMenu.tasks }
+                        newTask = { gotTask | description = value }
+                        newMenu = { oldMenu | tasks = setAt index newTask oldMenu.tasks }
                     in
                     ( {model | route = EditMenuRoute newMenu }
                     , Cmd.none)
                 TaskSpoons ->
                     let 
-                        newMenu = {oldMenu | tasks = setAt index {gotTask | spoons = stringToSpoons value } oldMenu.tasks }
+                        newTask = {gotTask | spoons = stringToSpoons value }
+                        newMenu = {oldMenu | tasks = setAt index newTask oldMenu.tasks }
                     in
                     ( { model | route = EditMenuRoute newMenu } 
                     , Cmd.none)
@@ -196,8 +127,20 @@ updateTask taskInput index value model oldMenu =
 -- VIEW
 view : Model -> Browser.Document Msg
 view model =
-    let
-        currentView = case model.route of
+    { title = "ToDoMenu"
+    , body = 
+        [ E.layout 
+            [ E.width E.fill ] 
+            ( E.column 
+                [ E.width E.fill
+                , E.spacing 8 ]
+                (navBar :: currentView model.route)
+            ) 
+        ]
+    }
+
+currentView : Route -> List (E.Element Msg)
+currentView route = case route of
             EditMenuRoute newMenu->
                 [ E.column 
                     [ E.centerX ] 
@@ -205,7 +148,7 @@ view model =
                         []
                         { onChange = UpdateNewMenuTitle
                         , text = newMenu.title
-                        , label = Input.labelAbove [E.centerX] <| E.text "Menu title"
+                        , label = Input.labelAbove [ E.centerX ] <| E.text "Menu title"
                         , placeholder = Just <| Input.placeholder [] <| E.text "Self-care activities"
                         }
                     ]
@@ -218,17 +161,6 @@ view model =
                 [ E.el [] <| E.text "MenuListRoute" ]
             PickTasksRoute -> 
                 [ E.el [] <| E.text "PickTasksRoute" ]
-    in
-    { title = "ToDoMenu"
-    , body = 
-        [ E.layout 
-            [ E.width E.fill ] 
-            <| E.column 
-                [ E.width E.fill
-                , E.spacing 8]
-                (navBar :: currentView) 
-        ]
-    }
 
 navBar : E.Element Msg
 navBar = 
@@ -289,12 +221,4 @@ inputTask (index, task) =
             , placeholder = Just (Input.placeholder [] <| E.text "1-3")
             , label = Input.labelHidden "Spoons"
             }
-        ]
-
-displayTask : Task -> Html Msg
-displayTask task = 
-    div [] 
-        [ p [] [text task.name]
-        , p [] [text task.description]
-        , p [] [text (String.fromInt task.spoons)]
         ]
