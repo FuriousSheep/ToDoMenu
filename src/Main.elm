@@ -2,7 +2,6 @@ module Main exposing (..)
 
 import Browser
 import Browser.Navigation as Nav
-import Debug
 import Domain exposing (..)
 import Element as E
 import Element.Events as Ev
@@ -13,7 +12,6 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import List.Extra exposing (setAt, getAt, zip)
-import String
 import Url
 
 main : Program () Model Msg
