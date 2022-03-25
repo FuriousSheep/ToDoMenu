@@ -16,7 +16,6 @@ type alias Model =
 
 type Route
     = EditMenuRoute TodoMenu
-    | MenuListRoute
     | PickTasksRoute
 
 
@@ -59,9 +58,6 @@ routeToString route =
         EditMenuRoute _ ->
             "EditMenuRoute"
 
-        MenuListRoute ->
-            "MenuListRoute"
-
         PickTasksRoute ->
             "PickTasksRoute"
 
@@ -69,7 +65,6 @@ routeToString route =
 routesList : List Route
 routesList =
     [ EditMenuRoute emptyMenu
-    , MenuListRoute
     , PickTasksRoute
     ]
 

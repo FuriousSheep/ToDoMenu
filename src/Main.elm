@@ -88,9 +88,6 @@ update msg model =
                     , Cmd.none
                     )
 
-                MenuListRoute ->
-                    ( newModel, Cmd.none )
-
                 PickTasksRoute ->
                     ( newModel, Cmd.none )
 
@@ -125,36 +122,53 @@ view model =
                 [ E.width E.fill
                 , E.spacing 8
                 ]
-                (navBar :: currentView model.route)
+                (navBar :: currentView model model.route)
             )
         ]
     }
 
 
-currentView : Route -> List (E.Element Msg)
-currentView route =
+currentView : Model -> Route -> List (E.Element Msg)
+currentView model route =
     case route of
         EditMenuRoute newMenu ->
-            [ E.column
-                [ E.centerX ]
-                [ Input.text
-                    []
-                    { onChange = \str -> UpdateMenu { newMenu | title = str }
-                    , text = newMenu.title
-                    , label = Input.labelAbove [ E.centerX ] <| E.text "Menu title"
-                    , placeholder = Just <| Input.placeholder [] <| E.text "Self-care activities"
-                    }
+            [ E.row [ E.width E.fill ]
+                [ todoMenuMenu model.menus
+                , E.column
+                    [ E.centerX
+                    , E.width <| E.fillPortion 3
+                    ]
+                  <|
+                    List.map (inputTask newMenu) (List.indexedMap Tuple.pair newMenu.tasks)
+                        ++ [ addTaskButton newMenu ]
                 ]
-            , E.column [ E.centerX ] <|
-                List.map (inputTask newMenu) (List.indexedMap Tuple.pair newMenu.tasks)
-            , addTaskButton newMenu
             ]
-
-        MenuListRoute ->
-            [ E.el [] <| E.text "MenuListRoute" ]
 
         PickTasksRoute ->
             [ E.el [] <| E.text "PickTasksRoute" ]
+
+
+todoMenuMenu : List TodoMenu -> E.Element Msg
+todoMenuMenu menus =
+    let
+        menuInput menu =
+            Input.text
+                [ E.centerX
+                , E.width <| Debug.todo "give some padding"
+                ]
+                { onChange = \str -> UpdateMenu { menu | title = str }
+                , text = menu.title
+                , label = Input.labelAbove [ E.centerX ] <| E.text "Menu title"
+                , placeholder = Just <| Input.placeholder [] <| E.text "Self-care activities"
+                }
+    in
+    E.column
+        [ E.alignLeft
+        , E.width <| E.fillPortion 1
+        , E.alignTop
+        ]
+    <|
+        List.map menuInput menus
 
 
 navBar : E.Element Msg
