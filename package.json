@@ -2,7 +2,7 @@
   "name": "To Do Menus",
   "source": "index.html",
   "scripts": {
-    "start": "parcel"
+    "start": "npx parcel index.html"
   },
   "devDependencies": {
     "@parcel/transformer-elm": "^2.4.0",
